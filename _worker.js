@@ -189,6 +189,10 @@ async function handleRequest(request) {
 
   // 通用代理请求处理（兼容旧的 /?url=... 格式）
   if (targetUrlParam) {
+    // 单独的 m3u8 端点：拉 m3u8 并重写 .ts 链接
+    if (pathname === '/m3u8') {
+      return handleM3u8Request(request, targetUrlParam, currentOrigin)
+    }
     return handleProxyRequest(request, targetUrlParam, currentOrigin)
   }
 
@@ -274,6 +278,121 @@ async function handleProxyRequest(request, targetUrlParam, currentOrigin) {
       message: err.message || '代理请求失败',
       target: fullTargetUrl,
       timestamp: new Date().toISOString()
+    }, 502)
+  }
+}
+
+// ---------- M3U8 代理：拉 m3u8 并把 .ts 子链接也走 Worker ----------
+async function handleM3u8Request(request, targetUrlParam, currentOrigin) {
+  if (targetUrlParam.startsWith(currentOrigin)) {
+    return errorResponse('Loop detected: self-fetch blocked', { url: targetUrlParam }, 400)
+  }
+  if (!/^https?:\/\//i.test(targetUrlParam)) {
+    return errorResponse('Invalid target URL', { url: targetUrlParam }, 400)
+  }
+
+  let fullTargetUrl = targetUrlParam
+  const urlMatch = request.url.match(/[?&]url=([^&]+)/)
+  if (urlMatch) fullTargetUrl = decodeURIComponent(urlMatch[1])
+
+  // 携带额外 query
+  const reqUrl = new URL(request.url)
+  const extraParams = new URLSearchParams()
+  for (const [key, value] of reqUrl.searchParams) {
+    if (key !== 'url') extraParams.append(key, value)
+  }
+
+  let targetURL
+  try {
+    targetURL = new URL(fullTargetUrl)
+    for (const [key, value] of extraParams) {
+      targetURL.searchParams.append(key, value)
+    }
+  } catch {
+    return errorResponse('Invalid URL', { url: fullTargetUrl }, 400)
+  }
+
+  const baseOrigin = currentOrigin
+  const m3u8Base = `${baseOrigin}/?url=`
+
+  // 判断一个 segment 链接是否需要包代理
+  // 1) 绝对 http(s) 链接：包一层 ?url= 走本 worker
+  // 2) 相对路径 / 协议相对 //开头：用 m3u8 自身 base 拼成绝对再包
+  const wrapSegment = (rawLine) => {
+    const line = rawLine.trim()
+    if (!line) return line
+    // 注释行 / EXT 行不动
+    if (line.startsWith('#')) return line
+    // 已经是 http 绝对
+    if (/^https?:\/\//i.test(line)) {
+      return m3u8Base + encodeURIComponent(line)
+    }
+    // 协议相对 //host/path
+    if (line.startsWith('//')) {
+      const abs = targetURL.protocol + line
+      return m3u8Base + encodeURIComponent(abs)
+    }
+    // 相对路径
+    try {
+      const abs = new URL(line, targetURL).toString()
+      return m3u8Base + encodeURIComponent(abs)
+    } catch {
+      return line
+    }
+  }
+
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 9000)
+    const upstream = await fetch(targetURL.toString(), {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36' },
+      signal: controller.signal,
+    })
+    clearTimeout(timeoutId)
+    const text = await upstream.text()
+
+    // 简单判断 master playlist (含 #EXT-X-STREAM-INF) → 递归把所有 variant m3u8 也包一层
+    const isMaster = /#EXT-X-STREAM-INF/i.test(text)
+
+    const lines = text.split(/\r?\n/)
+    const out = []
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      // 对 URI="..." 属性里的链接也包一层
+      if (/^#EXT-X-KEY/i.test(line) || /^#EXT-X-MAP/i.test(line) || /^#EXT-X-MEDIA/i.test(line) || /^#EXT-X-I-FRAME-STREAM-INF/i.test(line)) {
+        out.push(line.replace(/URI="([^"]+)"/g, (m, u) => {
+          let abs
+          try { abs = new URL(u, targetURL).toString() } catch { abs = u }
+          return `URI="${m3u8Base + encodeURIComponent(abs)}"`
+        }))
+        continue
+      }
+      // variant stream 行
+      if (isMaster && /^#EXT-X-STREAM-INF/i.test(line)) {
+        out.push(line)
+        // 紧跟的下一行就是 variant 链接
+        if (i + 1 < lines.length) {
+          out.push(wrapSegment(lines[i + 1]))
+          i++
+        }
+        continue
+      }
+      out.push(wrapSegment(line))
+    }
+
+    return new Response(out.join('\n'), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/vnd.apple.mpegurl',
+        'Cache-Control': 'no-store',
+        ...CORS_HEADERS,
+      },
+    })
+  } catch (err) {
+    await logError('m3u8', { message: err.message, url: fullTargetUrl })
+    return errorResponse('M3U8 Proxy Error', {
+      message: err.message,
+      target: fullTargetUrl,
     }, 502)
   }
 }
