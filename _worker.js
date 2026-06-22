@@ -287,13 +287,15 @@ async function handleProxyRequest(request, targetUrlParam, currentOrigin) {
   }
 }
 
-// 按目标域名补默认请求头 (客户端漏带 UA/Referer 时,补上,避免上游 403)
+// 按目标域名补默认请求头 (客户端漏带 UA/Referer 时,补上,避免上游 400/403)
 function applyDefaultHeadersForUpstream(headers, targetURL) {
   const host = targetURL.hostname.toLowerCase()
   // Bangumi 图片/数据系列:lain.bgm.tv / api.bgm.tv / bgm.tv
   if (host === 'lain.bgm.tv' || host === 'api.bgm.tv' || host === 'bgm.tv' || host.endsWith('.bgm.tv')) {
+    // ⚠️ api.bgm.tv v0 API 强制要求 UA 是 "App/Version (URL)" 格式,
+    // Chrome 标准 UA 会返 400
     if (!headers.has('User-Agent')) {
-      headers.set('User-Agent', 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36')
+      headers.set('User-Agent', 'LunaTV-Mobile/1.0 (https://github.com/djsevenx1/LunaTV-Mobile)')
     }
     if (!headers.has('Referer')) {
       headers.set('Referer', 'https://bgm.tv/')
