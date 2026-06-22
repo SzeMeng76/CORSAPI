@@ -450,7 +450,7 @@ async function handleFormatRequest(formatParam, sourceParam, prefixParam, defaul
   }
 }
 
-// ---------- 首页文档处理 ----------
+// ---------- 首页文档处理 (LunaTV 风格: 深色 + 绿主色 #22C55E) ----------
 async function handleHomePage(currentOrigin, defaultPrefix) {
   const html = `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -460,146 +460,308 @@ async function handleHomePage(currentOrigin, defaultPrefix) {
   <title>CORSAPI - API 中转代理服务</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --luna-green: #22C55E;
+      --luna-green-deep: #10B981;
+      --bg: #0F1117;
+      --card: #1F2937;
+      --border: #374151;
+      --text: #FFFFFF;
+      --sub: #9ca3af;
+      --muted: #6b7280;
+    }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 40px 20px;
-      line-height: 1.8;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
+      line-height: 1.6;
+      padding: 24px 16px;
     }
     .container {
-      background: white;
-      border-radius: 12px;
-      padding: 40px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 880px;
+      margin: 0 auto;
     }
-    h1 { color: #667eea; margin-bottom: 10px; font-size: 2.5em; }
-    .subtitle { color: #666; margin-bottom: 30px; font-size: 1.1em; }
-    h2 {
-      color: #333;
-      margin-top: 35px;
-      margin-bottom: 15px;
-      padding-bottom: 8px;
-      border-bottom: 2px solid #667eea;
+    /* 顶部条 (跟 LunaTV Web 顶栏同款) */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 4px 24px 4px;
     }
-    code {
-      background: #f4f4f4;
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-size: 0.9em;
-      color: #d63384;
-      font-family: 'Consolas', 'Monaco', monospace;
+    .logo {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, var(--luna-green), var(--luna-green-deep));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      color: #052e16;
+      font-size: 14px;
     }
-    pre {
-      background: #2d2d2d;
-      color: #f8f8f2;
-      padding: 20px;
-      border-radius: 8px;
-      overflow-x: auto;
-      margin: 15px 0;
-      font-family: 'Consolas', 'Monaco', monospace;
+    .brand {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
     }
-    .example {
-      background: #e8f5e9;
-      padding: 20px;
-      border-left: 4px solid #4caf50;
-      margin: 20px 0;
-      border-radius: 4px;
-    }
-    ul { margin: 15px 0; padding-left: 25px; }
-    li { margin: 10px 0; }
-    .badge {
-      display: inline-block;
+    .pill {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       padding: 4px 10px;
-      background: #667eea;
-      color: white;
-      border-radius: 12px;
-      font-size: 0.85em;
-      margin-left: 8px;
+      background: rgba(34, 197, 94, 0.12);
+      color: var(--luna-green);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
     }
-    .footer {
-      margin-top: 40px;
-      padding-top: 20px;
-      border-top: 1px solid #eee;
-      color: #666;
-      font-size: 0.9em;
-      text-align: center;
-    }
-    .footer a { color: #667eea; text-decoration: none; }
-    .footer a:hover { text-decoration: underline; }
-    .status {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      background: #4caf50;
+    .pill .dot {
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
-      margin-right: 6px;
+      background: var(--luna-green);
       animation: pulse 2s infinite;
     }
     @keyframes pulse {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+      50% { opacity: 0.4; }
+    }
+    /* 头部 */
+    .hero {
+      padding: 32px 28px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+    .hero h1 .accent {
+      color: var(--luna-green);
+    }
+    .hero p {
+      color: var(--sub);
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+    .url-card {
+      background: #0b0e14;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-family: 'SF Mono', Consolas, Monaco, monospace;
+      font-size: 13px;
+      color: var(--luna-green);
+      word-break: break-all;
+      margin-bottom: 8px;
+    }
+    .url-card .label {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+      font-family: -apple-system, sans-serif;
+    }
+    /* 章节 */
+    .section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+    }
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 14px;
+    }
+    .section-title::before {
+      content: "";
+      width: 3px;
+      height: 14px;
+      background: linear-gradient(180deg, var(--luna-green), var(--luna-green-deep));
+      border-radius: 2px;
+    }
+    .section p {
+      color: var(--sub);
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+    .section p:last-child {
+      margin-bottom: 0;
+    }
+    pre {
+      background: #0b0e14;
+      color: #d1d5db;
+      padding: 14px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      font-family: 'SF Mono', Consolas, Monaco, monospace;
+      font-size: 12.5px;
+      line-height: 1.6;
+      margin: 10px 0;
+      white-space: pre;
+    }
+    pre .g { color: var(--luna-green); }
+    pre .d { color: var(--muted); }
+    code {
+      background: rgba(34, 197, 94, 0.12);
+      color: var(--luna-green);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'SF Mono', Consolas, Monaco, monospace;
+      font-size: 12.5px;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0;
+    }
+    li {
+      color: var(--sub);
+      font-size: 14px;
+      padding: 6px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    li::before {
+      content: "";
+      width: 5px;
+      height: 5px;
+      background: var(--luna-green);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    /* 网格 */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .feat {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 13.5px;
+      color: var(--sub);
+    }
+    .feat b {
+      color: var(--luna-green);
+      font-weight: 600;
+    }
+    /* 底部 */
+    .footer {
+      text-align: center;
+      padding: 20px 0 4px 0;
+      color: var(--muted);
+      font-size: 12.5px;
+    }
+    .footer a {
+      color: var(--luna-green);
+      text-decoration: none;
+    }
+    .footer a:hover {
+      text-decoration: underline;
+    }
+    @media (max-width: 600px) {
+      body { padding: 16px 12px; }
+      .hero { padding: 22px 18px; }
+      .hero h1 { font-size: 22px; }
+      .section { padding: 16px 18px; }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>🔄 CORSAPI</h1>
-    <p class="subtitle"><span class="status"></span>API 中转代理服务正在运行</p>
-
-    <p>基于 Cloudflare Workers 的通用 API 中转代理服务，用于加速和转发 API 请求。</p>
-
-    <h2>📖 基本用法</h2>
-    <p>在 API 请求前添加代理地址和 <code>?url=</code> 参数：</p>
-    <pre>${defaultPrefix}https://api.example.com/endpoint</pre>
-
-    <div class="example">
-      <strong>示例：代理一个 API 请求</strong><br><br>
-      原始请求：<code>https://api.example.com/data?id=123</code><br>
-      通过代理：<code>${currentOrigin}/?url=https://api.example.com/data&id=123</code>
+    <!-- 顶部条 -->
+    <div class="topbar">
+      <div class="logo">L</div>
+      <span class="brand">CORSAPI</span>
+      <span class="pill"><span class="dot"></span>运行中</span>
     </div>
 
-    <h2>🚀 高级用法</h2>
-    <p>使用专属路径避免缓存冲突（推荐）：</p>
-    <pre>${currentOrigin}/p/source1?url=https://api1.example.com/endpoint</pre>
-    <p>为不同 API 源使用不同路径标识符（如 <code>/p/source1</code>、<code>/p/source2</code>），可以：</p>
-    <ul>
-      <li>避免不同源之间的缓存冲突</li>
-      <li>提高客户端兼容性</li>
-      <li>更好的请求管理</li>
-    </ul>
-
-    <h2>🔧 参数转发</h2>
-    <p>所有额外的 query 参数都会自动转发到目标 API：</p>
-    <div class="example">
-      <strong>参数自动转发示例</strong><br><br>
-      请求：<code>${currentOrigin}/?url=https://api.example.com/list&page=1&limit=10</code><br>
-      转发：<code>https://api.example.com/list?page=1&limit=10</code>
+    <!-- 头部 -->
+    <div class="hero">
+      <h1>API 中转代理服务 <span class="accent">/ LunaTV 配套</span></h1>
+      <p>基于 Cloudflare Workers 的通用 API 中转代理,用于加速和转发跨域 API 请求。</p>
+      <div class="url-card">
+        <div class="label">基本用法 · 在 API 请求前添加代理 + <code>?url=</code></div>
+        ${defaultPrefix}https://api.example.com/endpoint
+      </div>
+      <div class="url-card">
+        <div class="label">M3U8 代理 · 拉 m3u8 并把 .ts 段链接也走 worker</div>
+        ${currentOrigin}/m3u8?url=https://example.com/index.m3u8
+      </div>
     </div>
 
-    <h2>✨ 功能特性</h2>
-    <ul>
-      <li>✅ 支持所有 HTTP 方法（GET、POST、PUT、DELETE 等）</li>
-      <li>✅ 自动转发请求头和请求体</li>
-      <li>✅ 完整的 CORS 支持</li>
-      <li>✅ 超时保护<span class="badge">9秒</span></li>
-      <li>✅ 自动参数转发</li>
-      <li>✅ 防止递归调用</li>
-      <li>✅ 可选的 KV 缓存支持</li>
-    </ul>
+    <!-- 端点 -->
+    <div class="section">
+      <div class="section-title">端点</div>
+      <ul>
+        <li><code>GET /?url=&lt;encoded&gt;</code> 通用代理,透传 method/headers/body</li>
+        <li><code>GET /m3u8?url=&lt;encoded&gt;</code> m3u8 代理,自动重写 .ts 链接为 <code>worker/?url=...</code></li>
+        <li><code>GET /p/{source}?url=&lt;encoded&gt;</code> 源专属路径,避免缓存冲突</li>
+        <li><code>GET /health</code> 健康检查</li>
+        <li><code>GET /?format=1&amp;source=full</code> 输出 LunaTV JSON 配置 (proxy 模式)</li>
+      </ul>
+    </div>
 
-    <h2>🏥 健康检查</h2>
-    <p>访问 <code>/health</code> 端点检查服务状态：</p>
-    <pre>${currentOrigin}/health</pre>
+    <!-- 用法示例 -->
+    <div class="section">
+      <div class="section-title">用法示例</div>
+      <p>代理一个 API 请求:</p>
+      <pre>原始: <span class="d">https://api.example.com/data?id=123</span>
+代理: <span class="g">${currentOrigin}/?url=https://api.example.com/data?id=123</span></pre>
+      <p>额外 query 参数自动转发到目标 URL:</p>
+      <pre>请求: <span class="g">${currentOrigin}/?url=https://api.example.com/list&page=1&limit=10</span>
+转发: <span class="d">https://api.example.com/list?page=1&limit=10</span></pre>
+    </div>
+
+    <!-- 特性 -->
+    <div class="section">
+      <div class="section-title">功能特性</div>
+      <div class="grid">
+        <div class="feat"><b>HTTP 全方法</b><br>GET / POST / PUT / DELETE 等</div>
+        <div class="feat"><b>自动参数转发</b><br>query 透传给目标</div>
+        <div class="feat"><b>CORS 完整</b><br>Access-Control-* 全套</div>
+        <div class="feat"><b>超时保护</b><br>9 秒,避免悬挂</div>
+        <div class="feat"><b>自反循环检测</b><br>防止 worker 套 worker</div>
+        <div class="feat"><b>bgm.tv fallback</b><br>UA / Referer 自动补</div>
+      </div>
+    </div>
+
+    <!-- 配套 -->
+    <div class="section">
+      <div class="section-title">配套 App</div>
+      <p>推荐配合 <code>LunaTV-Mobile</code> 使用,在 App 菜单填入 worker 域名即可自动接管 Bangumi 数据/图片代理 + 源加速 + m3u8 端点重写。</p>
+      <pre>Bangumi 数据源  → <span class="g">CF Worker 加速</span>
+Bangumi 图片源  → <span class="g">CF Worker 加速</span>
+播放器源测速   → 走 worker (测得延迟 ≈ 实际播放延迟)
+m3u8 播放      → 走 <span class="g">/m3u8?url=</span>, .ts 子链接自动重写到 worker</pre>
+    </div>
 
     <div class="footer">
-      <p>
-        项目地址：<a href="https://github.com/SzeMeng76/CORSAPI" target="_blank">SzeMeng76/CORSAPI</a><br>
-        <small>基于 <a href="https://github.com/hafrey1/LunaTV-config" target="_blank">hafrey1/LunaTV-config</a> 二次开发</small>
-      </p>
-      <p>Powered by Cloudflare Workers</p>
+      <a href="https://github.com/djsevenx1/CORSAPI" target="_blank">djsevenx1/CORSAPI</a>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/djsevenx1/LunaTV-Mobile" target="_blank">LunaTV-Mobile</a>
+      <br>
+      <span style="margin-top: 6px; display: inline-block;">Powered by Cloudflare Workers</span>
     </div>
   </div>
 </body>
