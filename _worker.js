@@ -246,10 +246,15 @@ async function handleProxyRequest(request, targetUrlParam, currentOrigin) {
     return errorResponse('Invalid URL', { url: fullTargetUrl }, 400)
   }
 
+  // 构造透传请求头,如果客户端没带必要的头,按目标域名补上 fallback
+  // (典型:lain.bgm.tv 拒无 UA 的请求)
+  const upstreamHeaders = new Headers(request.headers)
+  applyDefaultHeadersForUpstream(upstreamHeaders, targetURL)
+
   try {
     const proxyRequest = new Request(targetURL.toString(), {
       method: request.method,
-      headers: request.headers,
+      headers: upstreamHeaders,
       body: request.method !== 'GET' && request.method !== 'HEAD'
         ? await request.arrayBuffer()
         : undefined,
@@ -279,6 +284,23 @@ async function handleProxyRequest(request, targetUrlParam, currentOrigin) {
       target: fullTargetUrl,
       timestamp: new Date().toISOString()
     }, 502)
+  }
+}
+
+// 按目标域名补默认请求头 (客户端漏带 UA/Referer 时,补上,避免上游 403)
+function applyDefaultHeadersForUpstream(headers, targetURL) {
+  const host = targetURL.hostname.toLowerCase()
+  // Bangumi 图片/数据系列:lain.bgm.tv / api.bgm.tv / bgm.tv
+  if (host === 'lain.bgm.tv' || host === 'api.bgm.tv' || host === 'bgm.tv' || host.endsWith('.bgm.tv')) {
+    if (!headers.has('User-Agent')) {
+      headers.set('User-Agent', 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36')
+    }
+    if (!headers.has('Referer')) {
+      headers.set('Referer', 'https://bgm.tv/')
+    }
+    if (!headers.has('Accept')) {
+      headers.set('Accept', 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8')
+    }
   }
 }
 
