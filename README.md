@@ -1,117 +1,125 @@
-# CORSAPI - API 代理转发服务
+# CORSAPI - API 中转代理服务
 
-基于 Cloudflare Workers 的通用 API 中转代理服务，用于加速和转发 API 请求。
+> 基于 Cloudflare Workers 的通用 API 中转代理,LunaTV-Mobile 配套后端,深色 + 绿主色首页风格。
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/SzeMeng76/CORSAPI)
-
-> **Credit**: 本项目二开自 [hafrey1/LunaTV-config](https://github.com/hafrey1/LunaTV-config)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/djsevenx1/CORSAPI)
 
 ---
 
-## 功能特性
+## ✨ 特性
 
-- ✅ 支持所有 HTTP 方法（GET、POST、PUT、DELETE 等）
-- ✅ 自动转发请求头和请求体
-- ✅ 完整的 CORS 支持
-- ✅ 超时保护（9 秒）
-- ✅ 为每个 API 源生成唯一路径，避免缓存冲突
-- ✅ 自动提取并转发额外的 query 参数
-- ✅ 支持 KV 缓存（可选）
+- 🚀 **全方法 HTTP 代理** — GET / POST / PUT / DELETE 等所有方法,自动转发 headers / body
+- 📺 **M3U8 端点重写** — `/m3u8?url=...` 自动把 .ts / 加密 key / MAP / 媒体轨道 全部回环到 worker,绕开原站 CDN 限速
+- 🌐 **完整 CORS** — `Access-Control-*` 全套响应头,前端可直连
+- 🛡 **防自反** — 阻止 worker 调自身的循环
+- ⏱ **9s 超时保护** — 避免悬挂
+- 🧠 **参数透传** — 除 `url` 外的 query 参数自动追加到目标 URL(`?ac=list&pg=1` 这类)
+- 🎯 **源专属路径** — `/p/source1?url=...` 给不同源独立路径,避免缓存冲突
+- 🎨 **深色 + 绿主色首页** — 访问根域名就有 LunaTV 风格的 UI 介绍
+- 🩹 **bgm.tv fallback** — 对 `api.bgm.tv` / `lain.bgm.tv` / `bgm.tv` 自动补正确的 `App/Version (URL)` UA + `Referer`,客户端漏带头时也不 400/403
+
+> **Credit**: 本项目二开自 [hafrey1/LunaTV-config](https://github.com/hafrey1/LunaTV-config) 的 CORSAPI 部分。
 
 ---
 
-## 快速部署
+## 🚀 快速部署
 
-### 方式一：部署到 Cloudflare Workers
+### 方式一:Cloudflare Dashboard 手贴
 
 1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com)
-2. 进入 **Workers & Pages** → **创建应用程序** → **Workers**
-3. 从 **Hello World!** 开始 → 项目命名 → **部署** → **编辑代码**
-4. 将 `_worker.js` 文件内容复制到在线编辑器中
-5. 点击 **保存并部署** 完成上线
-6. （可选）绑定自定义域名：
-   - 打开 Worker 设置 → **Triggers** → **Custom Domains**
-   - 添加你的域名并保存
+2. **Workers & Pages** → **Create** → **Workers** → 选 **Hello World!** 模板
+3. 项目命名 → **Deploy** → **Edit Code**
+4. 把本仓库 `_worker.js` 全部内容贴进去
+5. **Save and Deploy**
+6. (可选)Worker 设置 → **Triggers** → **Custom Domains** 绑域名
 
-### 方式二：部署到 Cloudflare Pages
+部署完成后访问 worker 域名,会看到 LunaTV 风格的深色首页。
+
+### 方式二:Cloudflare Pages
 
 1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com)
-2. 下载本仓库中的 `_worker.js` 文件
-3. 在本地新建一个空文件夹，将 `_worker.js` 放入其中
-4. 前往 **Workers & Pages** → **创建应用程序** → **Pages**
-5. **上传资产** → 项目命名 → **创建项目** → 从计算机中选择文件夹
-6. 上传后点击 **部署站点**
+2. 下载本仓库 `_worker.js`
+3. 本地新建空文件夹,把 `_worker.js` 放进去
+4. **Workers & Pages** → **Create** → **Pages** → **Upload assets**
+5. 项目命名 → 选刚才的文件夹 → **Deploy site**
 
 ---
 
-## 使用方法
+## 📖 使用方法
 
-假设你的 Worker 部署在：`https://api.example.workers.dev`
+假设你的 Worker 部署在 `https://api.example.workers.dev`。
 
-### 基本用法
-
-通过 `?url=` 参数转发任意 API 请求：
+### 通用代理
 
 ```
-https://api.example.workers.dev/?url=https://example.com/api
+GET https://api.example.workers.dev/?url=https://example.com/api
 ```
 
-### 高级用法：源专属路径
-
-为每个 API 源使用唯一路径（推荐）：
+### M3U8 代理(自动重写 .ts 链接)
 
 ```
-https://api.example.workers.dev/p/source1?url=https://api1.com/vod
-https://api.example.workers.dev/p/source2?url=https://api2.com/vod
+GET https://api.example.workers.dev/m3u8?url=https://example.com/index.m3u8
 ```
 
-这样可以：
-- 避免不同源之间的缓存冲突
-- 让客户端认为是不同的 API 地址
-- 提高兼容性和稳定性
+返回的 m3u8 里所有 `.ts` / `.m3u8` / `.key` 子链接都被替换成 `https://api.example.workers.dev/?url=<encoded>`,
+浏览器/mpv 拉播放列表时会按改写后的链接走 worker,绕开原站 CDN 慢速。
 
-### 参数转发
-
-所有额外的 query 参数都会自动转发到目标 API：
+### 源专属路径
 
 ```
-请求：https://api.example.workers.dev/?url=https://example.com/api&ac=list&pg=1
-转发：https://example.com/api?ac=list&pg=1
+GET https://api.example.workers.dev/p/source1?url=https://api1.com/vod
+GET https://api.example.workers.dev/p/source2?url=https://api2.com/vod
+```
+
+不同源走不同路径,避免浏览器 / DNS / CDN 缓存冲突。
+
+### Query 参数自动转发
+
+```
+请求:https://api.example.workers.dev/?url=https://api.example.com/list&page=1&limit=10
+转发:https://api.example.com/list?page=1&limit=10
 ```
 
 ---
 
-## 健康检查
-
-访问 `/health` 端点检查服务状态：
+## 🩺 健康检查
 
 ```
-https://api.example.workers.dev/health
+GET /health
 ```
 
-返回 `OK` 表示服务正常运行。
+返回 `OK` 表示正常。
 
 ---
 
-## 可选配置
+## 🧰 配套项目
 
-### 启用 KV 缓存
+本项目作为 **[LunaTV-Mobile](https://github.com/djsevenx1/LunaTV-Mobile)** 的配套后端,
+在 App 菜单填入 worker 域名即可自动接管:
 
-如需使用 KV 缓存功能：
+| 场景 | 走法 |
+|---|---|
+| Bangumi 数据 (api.bgm.tv) | CF Worker → ciao-cors → 直连, 多级 fallback |
+| Bangumi 图片 (lain.bgm.tv) | CF Worker, 强制补 `App/Version (URL)` UA + Referer |
+| 播放器源测速 / m3u8 播放 | CF Worker, 走 `/m3u8` 端点重写 .ts |
 
-1. 在 Cloudflare Dashboard 中创建 KV 命名空间：
-   - **存储和数据库** → **Workers KV** → **Create namespace**
-   - 命名空间名称可自定义，例如：`MyKVNamespace`
+App 端 Bangumi 失败会自动降级:
+1. CF Worker 失败 → 改走 ciao-cors
+2. ciao-cors 也失败 → 改走直连
 
-2. 绑定 KV 命名空间到 Worker：
-   - 在 Worker 设置中 → **绑定** → **添加绑定** → **KV 命名空间**
-   - 变量名：`KV`
-   - 选择刚才创建的 KV 命名空间
-   - 点击 **添加绑定**
+---
 
-### 修改超时时间
+## ⚙️ 可选配置
 
-在 `_worker.js` 中找到以下代码并修改超时毫秒数：
+### KV 缓存
+
+1. **Storage & Databases** → **Workers KV** → **Create namespace**
+2. Worker 设置 → **Bindings** → **Add** → **KV namespace**
+3. 变量名填 `KV`,选刚才的 namespace,保存
+
+### 修改超时
+
+`_worker.js`:
 
 ```javascript
 const timeoutId = setTimeout(() => controller.abort(), 9000) // 默认 9 秒
@@ -119,45 +127,32 @@ const timeoutId = setTimeout(() => controller.abort(), 9000) // 默认 9 秒
 
 ---
 
-## 注意事项
+## 📝 bgm.tv fallback 头说明
 
-- **免费额度**：Cloudflare Workers 免费版每天有 10 万次请求额度
-- **超时设置**：默认请求超时时间为 9 秒
-- **CORS 支持**：已启用完整的 CORS 支持，可直接在前端应用中调用
-- **防止递归**：自动检测并阻止递归调用自身
+`api.bgm.tv` v0 API 严格校验 `User-Agent` 必须是 `App/Version (URL)` 格式,Chrome 标准 UA 会被返 400。
+`lain.bgm.tv` 图片服务对 `Referer` 也有要求。
 
----
+Worker 在 `applyDefaultHeadersForUpstream()` 里按目标域名补:
 
-## 技术细节
+| 域名 | User-Agent | Referer | Accept |
+|---|---|---|---|
+| `api.bgm.tv` | `LunaTV-Mobile/1.0 (https://github.com/djsevenx1/LunaTV-Mobile)` | `https://bgm.tv/` | `application/json`(由客户端传) |
+| `lain.bgm.tv` | 同上 | 同上 | `image/avif,image/webp,image/apng,image/*,*/*;q=0.8` |
+| `bgm.tv` / `*.bgm.tv` | 同上 | 同上 | 同上 |
 
-### 源标识符提取
-
-系统会自动从 API URL 中提取唯一标识符作为路径：
-
-- `caiji.maotaizy.cc` → `/p/maotai`
-- `iqiyizyapi.com` → `/p/iqiyi`
-- `api.maoyanapi.top` → `/p/maoyan`
-
-### 参数处理
-
-- 自动提取 `url=` 参数作为目标地址
-- 所有其他 query 参数自动转发到目标 API
-- 支持 POST/PUT 请求的 body 转发
+客户端**有**带这些头就透传,**没**带就补上,避免上游 400/403。
 
 ---
 
-## 免责声明
+## ⚠️ 注意事项
 
-本项目仅供学习和研究使用。使用本项目所产生的一切后果由使用者自行承担。
-
----
-
-## 致谢
-
-本项目基于 [hafrey1/LunaTV-config](https://github.com/hafrey1/LunaTV-config) 的 CORSAPI 部分进行二次开发和简化。
+- **免费额度** — Cloudflare Workers 免费版 10 万次/天
+- **超时** — 默认 9 秒,改 `_worker.js` 里 `9000` 那个数字
+- **CORS** — 完整启用,前端可直连
+- **防递归** — 自动检测并阻止 worker 调自身
 
 ---
 
-## 许可证
+## 📜 许可证
 
-本项目采用与原项目相同的许可证。
+与上游 [hafrey1/LunaTV-config](https://github.com/hafrey1/LunaTV-config) 一致。
