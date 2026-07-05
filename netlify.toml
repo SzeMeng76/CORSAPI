@@ -1,0 +1,16 @@
+# Netlify 部署配置 — CORSAPI Edge Function
+#
+# 跟 Cloudflare Workers 共享 _worker.js 的 handleRequest 逻辑.
+# 这个文件告诉 Netlify:
+#   1) 不用 build step, 直接 publish 当前目录
+#   2) 把 netlify/edge-functions/corsapi.js 部署成 Edge Function
+#   3) 接管所有路径 (跟 CF Worker 行为一致)
+
+[build]
+publish = "."
+
+# Edge Function: Deno 运行时, 跟 _worker.js 同一套 Web API
+# path = "/*" 让所有进来的请求都走 corsapi 这一个函数
+[[edge_functions]]
+function = "corsapi"
+path = "/*"

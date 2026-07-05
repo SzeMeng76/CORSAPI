@@ -701,7 +701,7 @@ async function handleHomePage(currentOrigin, defaultPrefix) {
     <!-- 头部 -->
     <div class="hero">
       <h1>API 中转代理服务 <span class="accent">/ LunaTV 配套</span></h1>
-      <p>基于 Cloudflare Workers 的通用 API 中转代理,用于加速和转发跨域 API 请求。</p>
+      <p>通用 API 中转代理,用于加速和转发跨域 API 请求。部署在 ${detectPlatform()} 上。</p>
       <div class="url-card">
         <div class="label">基本用法 · 在 API 请求前添加代理 + <code>?url=</code></div>
         ${defaultPrefix}https://api.example.com/endpoint
@@ -763,7 +763,7 @@ m3u8 播放      → 走 <span class="g">/m3u8?url=</span>, .ts 子链接自动�
       &nbsp;·&nbsp;
       <a href="https://github.com/djsevenx1/LunaTV-Mobile" target="_blank">LunaTV-Mobile</a>
       <br>
-      <span style="margin-top: 6px; display: inline-block;">Powered by Cloudflare Workers</span>
+      <span style="margin-top: 6px; display: inline-block;">Powered by ${detectPlatform()}</span>
     </div>
   </div>
 </body>
@@ -782,3 +782,17 @@ function errorResponse(error, data = {}, status = 400) {
     headers: { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS }
   })
 }
+
+
+// ---------- 平台检测 (首页 "Powered by ..." 用) ----------
+// Cloudflare Workers 没 Deno 全局, Netlify Edge Functions (Deno) 有
+function detectPlatform() {
+  if (typeof Deno !== 'undefined') return 'Netlify Edge Functions (Deno)'
+  return 'Cloudflare Workers'
+}
+
+// ---------- 命名导出 ----------
+// 供 netlify/edge-functions/corsapi.js 复用同一个 handleRequest
+// 不重复维护两套逻辑. Cloudflare 走上面 export default { fetch } 入口,
+// Netlify 走 netlify/edge-functions/corsapi.js 导入这个 handleRequest
+export { handleRequest, detectPlatform }

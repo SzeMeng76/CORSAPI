@@ -24,6 +24,24 @@
 
 ## 🚀 快速部署
 
+### 方式零:Netlify Edge Functions (推荐, 一键接入)
+
+跟 Cloudflare Workers **共享同一套 \`_worker.js\` 代码**, 不重复维护.
+Netlify Edge Functions 跑在 Deno runtime, Web API (Request / Response / fetch / URL) 原生支持.
+唯一缺的是 CF 的 KV —— \`_worker.js\` 已经用 \`typeof KV !== 'undefined'\` 守门, Netlify 上没 KV 就跳过缓存继续走 fetch, 一切正常.
+
+1. 把整个仓库 (含 \`_worker.js\` / \`netlify.toml\` / \`netlify/edge-functions/\`) 推到 GitHub
+2. 登录 [Netlify Dashboard](https://app.netlify.com/) → **Add new site** → **Import an existing project**
+3. 选 GitHub 仓库 \`djsevenx1/CORSAPI\`, 直接 **Deploy** (不用改 build command)
+4. 部署完 Netlify 分配 \`xxx.netlify.app\` 域名, 例如 \`https://corsapi.netlify.app/\`
+5. (可选) **Domain settings** → **Custom domains** 绑自己的域名
+
+部署后访问:
+- \`https://corsapi.netlify.app/\` → LunaTV 风格首页
+- \`https://corsapi.netlify.app/health\` → 健康检查
+- \`https://corsapi.netlify.app/?url=https://api.example.com/data\` → 通用代理
+- \`https://corsapi.netlify.app/m3u8?url=https://example.com/index.m3u8\` → M3U8 代理 (自动重写 .ts)
+
 ### 方式一:Cloudflare Dashboard 手贴
 
 1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com)
