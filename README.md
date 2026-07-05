@@ -1,6 +1,6 @@
 # CORSAPI - API 中转代理服务
 
-> 基于 Cloudflare Workers 的通用 API 中转代理,LunaTV-Mobile 配套后端,深色 + 绿主色首页风格。
+> 通用 API 中转代理服务,兼容 **Cloudflare Workers** 和 **Netlify Edge Functions**,LunaTV-Mobile 配套后端,深色 + 绿主色首页风格。
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/djsevenx1/CORSAPI)
 
@@ -164,10 +164,14 @@ Worker 在 `applyDefaultHeadersForUpstream()` 里按目标域名补:
 
 ## ⚠️ 注意事项
 
-- **免费额度** — Cloudflare Workers 免费版 10 万次/天
+- **Cloudflare Workers 免费版** — 10 万次/天,KV 命名空间可独立配额
+- **Netlify Edge Functions 免费版** — 100 万次/月,**CPU 时间 50ms/请求**(总计 100 小时/月)
+  - 9 秒超时在 Netlify 会被自动截断,如果你部署在 Netlify 且上游慢,建议把 `_worker.js` 里 `9000` 调小到 `40`,避免 Netlify 提前 abort
+  - 升级 Pro ($20/月) 可获 30 秒/请求 CPU 时间
 - **超时** — 默认 9 秒,改 `_worker.js` 里 `9000` 那个数字
 - **CORS** — 完整启用,前端可直连
 - **防递归** — 自动检测并阻止 worker 调自身
+- **KV 缓存可选** — 没绑 KV 就直接走 fetch,功能完全正常,只是少一层缓存
 
 ---
 
