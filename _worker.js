@@ -283,7 +283,8 @@ async function handleProxyRequest(request, targetUrlParam, currentOrigin) {
     })
 
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 9000)
+    // v2.0.28: 视频 .ts 段可能几 MB, 9s 不够 → 30s
+    const timeoutId = setTimeout(() => controller.abort(), 30000)
     const response = await fetch(proxyRequest, { signal: controller.signal })
     clearTimeout(timeoutId)
 
@@ -325,6 +326,17 @@ function applyDefaultHeadersForUpstream(headers, targetURL) {
     if (!headers.has('Accept')) {
       headers.set('Accept', 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8')
     }
+  }
+  // v2.0.28: 通用 fallback — 视频源/API 补 UA + Referer
+  // 很多多线视频 CDN 需要 Referer 才返回 m3u8/.ts, 否则 403
+  if (!headers.has('User-Agent')) {
+    headers.set('User-Agent', 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36')
+  }
+  if (!headers.has('Referer')) {
+    headers.set('Referer', targetURL.origin + '/')
+  }
+  if (!headers.has('Accept')) {
+    headers.set('Accept', '*/*')
   }
 }
 
@@ -410,9 +422,15 @@ async function handleM3u8Request(request, targetUrlParam, currentOrigin) {
 
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 9000)
+    const timeoutId = setTimeout(() => controller.abort(), 15000)
+    // v2.0.28: 带 Referer + Origin, 很多视频源需要才能返回 m3u8
     const upstream = await fetch(targetURL.toString(), {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+        'Referer': targetURL.origin + '/',
+        'Origin': targetURL.origin,
+        'Accept': '*/*',
+      },
       signal: controller.signal,
     })
     clearTimeout(timeoutId)
