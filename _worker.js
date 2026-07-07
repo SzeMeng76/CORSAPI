@@ -411,11 +411,19 @@ async function handleM3u8Request(request, targetUrlParam, currentOrigin) {
   }
 
   const baseOrigin = currentOrigin
-  const m3u8Base = `${baseOrigin}/?url=`
+  // v2.0.30: m3u8 端点也要识别 sub-m3u8 (递归), 用 /m3u8?url= 而不是 /?url=
+  // 否则 /?url= 拿到 sub-m3u8 后只 text() 原样返回, 里面的 .ts 链接没被重写
+  // libmpv 按 HLS 规范用 m3u8 自身 URL 解析相对 .ts → 错 → duration 出不来
+  const wrapBase = (rawUrl) => {
+    const u = (rawUrl || '').toLowerCase()
+    if (u.endsWith('.m3u8') || u.endsWith('.m3u')) return `${baseOrigin}/m3u8?url=`
+    return `${baseOrigin}/?url=`
+  }
 
   // 判断一个 segment 链接是否需要包代理
   // 1) 绝对 http(s) 链接：包一层 ?url= 走本 worker
   // 2) 相对路径 / 协议相对 //开头：用 m3u8 自身 base 拼成绝对再包
+  // 3) v2.0.30: m3u8 后缀用 /m3u8?url= (递归重写), 其他用 /?url= (直接转发)
   const wrapSegment = (rawLine) => {
     const line = rawLine.trim()
     if (!line) return line
@@ -423,17 +431,17 @@ async function handleM3u8Request(request, targetUrlParam, currentOrigin) {
     if (line.startsWith('#')) return line
     // 已经是 http 绝对
     if (/^https?:\/\//i.test(line)) {
-      return m3u8Base + encodeURIComponent(line)
+      return wrapBase(line) + encodeURIComponent(line)
     }
     // 协议相对 //host/path
     if (line.startsWith('//')) {
       const abs = targetURL.protocol + line
-      return m3u8Base + encodeURIComponent(abs)
+      return wrapBase(abs) + encodeURIComponent(abs)
     }
     // 相对路径
     try {
       const abs = new URL(line, targetURL).toString()
-      return m3u8Base + encodeURIComponent(abs)
+      return wrapBase(abs) + encodeURIComponent(abs)
     } catch {
       return line
     }
@@ -467,7 +475,7 @@ async function handleM3u8Request(request, targetUrlParam, currentOrigin) {
         out.push(line.replace(/URI="([^"]+)"/g, (m, u) => {
           let abs
           try { abs = new URL(u, targetURL).toString() } catch { abs = u }
-          return `URI="${m3u8Base + encodeURIComponent(abs)}"`
+          return `URI="${wrapBase(abs) + encodeURIComponent(abs)}"`
         }))
         continue
       }
