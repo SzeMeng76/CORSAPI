@@ -150,6 +150,28 @@ async function getCachedJSON(url) {
   }
 }
 
+// v2.0.20: m3u8 KV 缓存 (借鉴 cmliu/edgetunnel 的 KV 缓存思路)
+// m3u8 内容大多静态, 同一个剧集每次播放都要重新 fetch + 解析 + 重写太浪费.
+// 5 分钟 TTL 兼顾"主播切线路时及时刷新"和"重复请求秒回".
+// cacheKey 含 origin, 避免 worker 换域名后返错链接.
+async function getCachedM3u8(cacheKey) {
+  if (typeof KV === 'undefined' || !KV || typeof KV.get !== 'function') return null
+  try {
+    return await KV.get(cacheKey)
+  } catch {
+    return null
+  }
+}
+
+async function setCachedM3u8(cacheKey, text) {
+  if (typeof KV === 'undefined' || !KV || typeof KV.put !== 'function') return
+  try {
+    await KV.put(cacheKey, text, { expirationTtl: 300 }) // 5 分钟
+  } catch (e) {
+    // 写缓存失败不影响主流程
+  }
+}
+
 // ---------- 安全版：错误日志 ----------
 async function logError(type, info) {
   // 保留错误输出，便于调试
@@ -336,6 +358,27 @@ async function handleM3u8Request(request, targetUrlParam, currentOrigin) {
     return errorResponse('Invalid URL', { url: fullTargetUrl }, 400)
   }
 
+  // v2.0.20: KV 缓存查询 (含 origin 避免跨域名错链, ?nocache=1 跳过)
+  const cacheKey = `M3U8_${currentOrigin}_${targetURL.toString()}`
+  const nocache = reqUrl.searchParams.get('nocache') === '1'
+  if (!nocache) {
+    const cached = await getCachedM3u8(cacheKey)
+    if (cached !== null) {
+      return new Response(cached, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/vnd.apple.mpegurl',
+          'Cache-Control': 'public, max-age=60',
+          'X-Cache': 'HIT',
+          'X-Cache-TTL': '300',
+          // 借鉴: HTTP/3 Alt-Svc, 让客户端升级到 QUIC (CF 默认开, 几乎零成本)
+          'Alt-Svc': 'h3=":443"; ma=86400',
+          ...CORS_HEADERS,
+        },
+      })
+    }
+  }
+
   const baseOrigin = currentOrigin
   const m3u8Base = `${baseOrigin}/?url=`
 
@@ -404,11 +447,20 @@ async function handleM3u8Request(request, targetUrlParam, currentOrigin) {
       out.push(wrapSegment(line))
     }
 
-    return new Response(out.join('\n'), {
+    const outText = out.join('\n')
+
+    // v2.0.20: 写缓存 (后台 fire-and-forget, 不阻塞响应)
+    if (!nocache) {
+      ctxWaitUntil(setCachedM3u8(cacheKey, outText))
+    }
+
+    return new Response(outText, {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.apple.mpegurl',
         'Cache-Control': 'no-store',
+        'X-Cache': nocache ? 'BYPASS' : 'MISS',
+        'Alt-Svc': 'h3=":443"; ma=86400',
         ...CORS_HEADERS,
       },
     })
@@ -419,6 +471,19 @@ async function handleM3u8Request(request, targetUrlParam, currentOrigin) {
       target: fullTargetUrl,
     }, 502)
   }
+}
+
+// v2.0.20: ctx.waitUntil 的安全 fallback
+// Pages Functions 没 ctx, Netlify 也没, 直接执行函数即可
+function ctxWaitUntil(promise) {
+  try {
+    if (typeof ctx !== 'undefined' && ctx && typeof ctx.waitUntil === 'function') {
+      ctx.waitUntil(promise)
+      return
+    }
+  } catch {}
+  // 没 ctx 就当普通 promise, 不 await (fire-and-forget)
+  promise.catch(() => {})
 }
 
 // ---------- JSON 格式输出处理子模块 ----------
@@ -745,6 +810,8 @@ async function handleHomePage(currentOrigin, defaultPrefix) {
         <div class="feat"><b>超时保护</b><br>9 秒,避免悬挂</div>
         <div class="feat"><b>自反循环检测</b><br>防止 worker 套 worker</div>
         <div class="feat"><b>bgm.tv fallback</b><br>UA / Referer 自动补</div>
+        <div class="feat"><b>M3U8 KV 缓存</b><br>5 分钟复用, 减少 worker CPU</div>
+        <div class="feat"><b>HTTP/3 (QUIC)</b><br>Alt-Svc 头提示升级, CF 默认开</div>
       </div>
     </div>
 

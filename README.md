@@ -10,6 +10,8 @@
 
 - 🚀 **全方法 HTTP 代理** — GET / POST / PUT / DELETE 等所有方法,自动转发 headers / body
 - 📺 **M3U8 端点重写** — `/m3u8?url=...` 自动把 .ts / 加密 key / MAP / 媒体轨道 全部回环到 worker,绕开原站 CDN 限速
+- 🧠 **M3U8 KV 缓存 (v2.0.20+)** — 改写后的 m3u8 缓存到 Workers KV,5 分钟复用,大幅减少 worker CPU + 出口流量
+- ⚡ **HTTP/3 (QUIC) Alt-Svc (v2.0.20+)** — 返回头带 `Alt-Svc: h3=":443"`,客户端自动升级到 QUIC(降延迟、抗丢包)
 - 🌐 **完整 CORS** — `Access-Control-*` 全套响应头,前端可直连
 - 🛡 **防自反** — 阻止 worker 调自身的循环
 - ⏱ **9s 超时保护** — 避免悬挂
@@ -82,6 +84,23 @@ GET https://api.example.workers.dev/m3u8?url=https://example.com/index.m3u8
 返回的 m3u8 里所有 `.ts` / `.m3u8` / `.key` 子链接都被替换成 `https://api.example.workers.dev/?url=<encoded>`,
 浏览器/mpv 拉播放列表时会按改写后的链接走 worker,绕开原站 CDN 慢速。
 
+#### 调试参数
+
+- `?nocache=1` 跳过 KV 缓存(主播切线路调试、排查缓存问题时用)
+- 响应头 `X-Cache: HIT / MISS / BYPASS` 标识缓存命中状态
+
+#### 缓存策略 (v2.0.20+)
+
+绑了 KV 命名空间后,改写后的 m3u8 会缓存 5 分钟:
+
+| 请求 | 响应 | 说明 |
+|---|---|---|
+| 首次 | `X-Cache: MISS` | fetch 源 + 解析 + 重写,后台异步写 KV |
+| 5 分钟内重复 | `X-Cache: HIT` | 直接返 KV 内容,毫秒级 |
+| 加 `?nocache=1` | `X-Cache: BYPASS` | 跳过 KV,强制拉源(不写) |
+
+未绑 KV 时自动跳过缓存,功能完全正常,只是没加速。
+
 ### 源专属路径
 
 ```
@@ -129,11 +148,22 @@ App 端 Bangumi 失败会自动降级:
 
 ## ⚙️ 可选配置
 
-### KV 缓存
+### KV 缓存 (强烈推荐)
 
+绑 KV 命名空间后,会启用两层缓存:
+
+| 缓存内容 | TTL | 命中场景 |
+|---|---|---|
+| LunaTV JSON 配置 (`?format=1&source=...`) | 10 分钟 | App 启动拉源列表 |
+| **m3u8 改写结果 (`/m3u8?url=...`)** | **5 分钟** | 重复拉同一个剧集 m3u8 |
+
+**配置步骤**:
 1. **Storage & Databases** → **Workers KV** → **Create namespace**
 2. Worker 设置 → **Bindings** → **Add** → **KV namespace**
 3. 变量名填 `KV`,选刚才的 namespace,保存
+4. 重新部署
+
+未绑 KV 时自动跳过缓存,功能完全正常,只是没加速。
 
 ### 修改超时
 
