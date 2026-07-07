@@ -285,7 +285,21 @@ async function handleProxyRequest(request, targetUrlParam, currentOrigin) {
     const controller = new AbortController()
     // v2.0.28: 视频 .ts 段可能几 MB, 9s 不够 → 30s
     const timeoutId = setTimeout(() => controller.abort(), 30000)
-    const response = await fetch(proxyRequest, { signal: controller.signal })
+    // v2.0.28: 用 cf 选项让 CF cache .ts 段
+    // .ts 段是静态文件, 同一段第二次请求直接从 CF edge 返回, 不回源
+    const isTsSegment = targetURL.pathname.endsWith('.ts') ||
+                        targetURL.pathname.endsWith('.m4s') ||
+                        targetURL.pathname.endsWith('.jpeg') ||
+                        targetURL.pathname.endsWith('.jpg') ||
+                        targetURL.pathname.endsWith('.png')
+    const fetchOptions = {
+      signal: controller.signal,
+      cf: isTsSegment ? {
+        cacheTtl: 3600,          // CF edge cache 1 小时
+        cacheEverything: true,   // 缓存所有响应 (包括非 200)
+      } : undefined,
+    }
+    const response = await fetch(proxyRequest, fetchOptions)
     clearTimeout(timeoutId)
 
     const responseHeaders = new Headers(CORS_HEADERS)
@@ -293,6 +307,11 @@ async function handleProxyRequest(request, targetUrlParam, currentOrigin) {
       if (!EXCLUDE_HEADERS.has(key.toLowerCase())) {
         responseHeaders.set(key, value)
       }
+    }
+    // v2.0.28: .ts 段加 Cache-Control, 让 CF edge cache
+    if (isTsSegment && response.status === 200) {
+      responseHeaders.set('Cache-Control', 'public, max-age=3600')
+      responseHeaders.set('CDN-Cache-Control', 'public, max-age=3600')
     }
 
     return new Response(response.body, {
