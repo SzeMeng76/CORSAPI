@@ -2,7 +2,10 @@
 
 > 通用 API 中转代理服务,兼容 **Cloudflare Workers** 和 **Netlify Edge Functions**,LunaTV-Mobile 配套后端,深色 + 绿主色首页风格。
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/djsevenx1/CORSAPI)
+**原始仓库**: [SzeMeng76/CORSAPI](https://github.com/SzeMeng76/CORSAPI)  
+**LunaTV 配套版本**: [djsevenx1/CORSAPI](https://github.com/djsevenx1/CORSAPI) · [LunaTV-Mobile](https://github.com/djsevenx1/LunaTV-Mobile)
+
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/SzeMeng76/CORSAPI)
 
 ---
 
@@ -34,7 +37,7 @@ Netlify Edge Functions 跑在 Deno runtime, Web API (Request / Response / fetch 
 
 1. 把整个仓库 (含 \`_worker.js\` / \`netlify.toml\` / \`netlify/edge-functions/\`) 推到 GitHub
 2. 登录 [Netlify Dashboard](https://app.netlify.com/) → **Add new site** → **Import an existing project**
-3. 选 GitHub 仓库 \`djsevenx1/CORSAPI\`, 直接 **Deploy** (不用改 build command)
+3. 选你的 GitHub 仓库, 直接 **Deploy** (不用改 build command)
 4. 部署完 Netlify 分配 \`xxx.netlify.app\` 域名, 例如 \`https://corsapi.netlify.app/\`
 5. (可选) **Domain settings** → **Custom domains** 绑自己的域名
 
@@ -131,7 +134,9 @@ GET /health
 
 ## 🧰 配套项目
 
-本项目作为 **[LunaTV-Mobile](https://github.com/djsevenx1/LunaTV-Mobile)** 的配套后端,
+本项目作为 **[LunaTV-Mobile](https://github.com/djsevenx1/LunaTV-Mobile)** 的配套后端。
+原始仓库为 [SzeMeng76/CORSAPI](https://github.com/SzeMeng76/CORSAPI)。
+
 在 App 菜单填入 worker 域名即可自动接管:
 
 | 场景 | 走法 |
