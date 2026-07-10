@@ -463,6 +463,24 @@ async function handleM3u8Request(request, targetUrlParam, currentOrigin) {
     clearTimeout(timeoutId)
     const text = await upstream.text()
 
+    // v2.0.63: 检测上游返回的是不是有效 m3u8 (以 #EXTM3U 开头).
+    //   有些源给的是 /share/xxx 分享页 (HTML), worker 之前把 HTML 当 m3u8
+    //   解析, 每行包一层 ?url= 返回伪 m3u8 → libmpv "Failed to recognize
+    //   file format". 现在不是 m3u8 就原样转发 (带原 Content-Type), 让
+    //   客户端自己处理.
+    const trimmed = text.trimStart()
+    if (!trimmed.startsWith('#EXTM3U')) {
+      const headers = new Headers(upstream.headers)
+      headers.set('Access-Control-Allow-Origin', '*')
+      headers.delete('content-encoding')
+      headers.delete('content-length')
+      return new Response(text, {
+        status: upstream.status,
+        statusText: upstream.statusText,
+        headers,
+      })
+    }
+
     // 简单判断 master playlist (含 #EXT-X-STREAM-INF) → 递归把所有 variant m3u8 也包一层
     const isMaster = /#EXT-X-STREAM-INF/i.test(text)
 
