@@ -203,6 +203,12 @@ async function handleRequest(request) {
     return new Response('OK', { status: 200, headers: CORS_HEADERS })
   }
 
+  // 🚀 测速端点：流式返回指定大小随机字节
+  // 默认 1MB, ?size=N (MB), 范围 1-50. 客户端测得下载速度 = 用户到 worker 的实际速度
+  if (pathname === '/speed') {
+    return handleSpeedTest(reqUrl)
+  }
+
   // 🔑 新增：处理源专属路径 /p/{sourceId}?url=...
   // 这样可以让 TVBox 认为每个源是不同的域名/路径
   if (pathname.startsWith('/p/') && targetUrlParam) {
@@ -904,6 +910,50 @@ m3u8 播放      → 走 <span class="g">/m3u8?url=</span>, .ts 子链接自动�
   return new Response(html, {
     status: 200,
     headers: { 'Content-Type': 'text/html; charset=utf-8', ...CORS_HEADERS }
+  })
+}
+
+// ---------- 测速端点 ----------
+// 流式返回指定 MB 数的随机字节, 客户端测下载速度 = 用户到 worker 的实际带宽
+// 默认 1MB, ?size=N (MB), 范围 1-50. 用 ReadableStream 避免一次性分配大内存
+async function handleSpeedTest(reqUrl) {
+  const sizeParam = parseInt(reqUrl.searchParams.get('size') || '1', 10)
+  const sizeMB = Math.max(1, Math.min(50, isNaN(sizeParam) ? 1 : sizeParam))
+  const totalBytes = sizeMB * 1024 * 1024
+  const chunkSize = 256 * 1024 // 256KB per chunk, 平衡吞吐和内存
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      let sent = 0
+      const chunk = new Uint8Array(chunkSize)
+      try {
+        while (sent < totalBytes) {
+          const remaining = totalBytes - sent
+          const currentChunk = remaining >= chunkSize ? chunk : chunk.slice(0, remaining)
+          crypto.getRandomValues(currentChunk)
+          controller.enqueue(currentChunk)
+          sent += currentChunk.length
+          // 每发 1MB 让出一次主线程, 让底层 flush 数据
+          if (sent % (1024 * 1024) === 0) {
+            await new Promise(resolve => setTimeout(resolve, 0))
+          }
+        }
+        controller.close()
+      } catch (e) {
+        controller.error(e)
+      }
+    }
+  })
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': totalBytes.toString(),
+      'Content-Disposition': `attachment; filename="speedtest-${sizeMB}mb.bin"`,
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+      ...CORS_HEADERS
+    }
   })
 }
 
