@@ -915,43 +915,26 @@ m3u8 播放      → 走 <span class="g">/m3u8?url=</span>, .ts 子链接自动�
 
 // ---------- 测速端点 ----------
 // 流式返回指定 MB 数的随机字节, 客户端测下载速度 = 用户到 worker 的实际带宽
-// 默认 1MB, ?size=N (MB), 范围 1-50.
-// v2.0.82 修复:
-//   - v2.0.80 用 ReadableStream + setTimeout(resolve, 0) 让出主线程 → CF edge
-//     误判"流空闲"在传输途中切断, mobile 测到 received=0 显示 0.00 MB/s
-//   - v2.0.81 改一次性 new Uint8Array(50MB) → CF Workers 128MB 内存限制下
-//     1MB 也返 500 error code 1101 (exceeded memory limit)
-//   - v2.0.82 用 ReadableStream 但不让出主线程, 每个 chunk 一次性 enqueue,
-//     持续高流量 CF edge 不会切断. 每次只占 64KB 内存, 50MB 不会爆内存
+// 默认 1MB, ?size=N (MB), 范围 1-3 (v2.0.84 缩小到 3MB 上限).
+// v2.0.84 用 Uint8Array 一次性 Response, 不用 ReadableStream/TransformStream,
+//   避免 CF edge backpressure 切断问题.
+//   v2.0.80 setTimeout 0 → CF edge 误判流空闲切断 (mobile 收到 0 字节)
+//   v2.0.81 一次性 50MB Uint8Array → 1MB 也 500 (CF Workers 内存峰值问题)
+//   v2.0.82 start 一次性 enqueue → CF edge 反复切断, 1MB 测试 15s 只传 415KB
+//   v2.0.83 pull + TransformStream → 太复杂, 仍然会被 backpressure 切
+//   v2.0.84 Uint8Array(size).fill(0) 不调 crypto.getRandomValues, Response 直接 return.
+//     1MB / 2MB / 3MB Uint8Array 内存峰值 < 4MB, 远低于 128MB 限制
+//     不用 random 是因为 crypto.getRandomValues 在某些 CF edge 节点会触发额外内存分配
+//     测速场景不需要密码学安全随机, 0 字节能填满带宽就够
 async function handleSpeedTest(reqUrl) {
   const sizeParam = parseInt(reqUrl.searchParams.get('size') || '1', 10)
-  const sizeMB = Math.max(1, Math.min(50, isNaN(sizeParam) ? 1 : sizeParam))
+  // v2.0.84: 上限 3MB, 内存峰值 < 4MB 完全安全
+  const sizeMB = Math.max(1, Math.min(3, isNaN(sizeParam) ? 1 : sizeParam))
   const totalBytes = sizeMB * 1024 * 1024
-  const chunkSize = 64 * 1024 // 64KB per chunk, 小到内存无压力
+  // 一次性 Uint8Array 全填 0, 不调 crypto.getRandomValues (避免某些节点内存爆)
+  const buffer = new Uint8Array(totalBytes)
 
-  const stream = new ReadableStream({
-    start(controller) {
-      let sent = 0
-      try {
-        // 一次性循环 enqueue 所有 chunk, 不 await 任何东西
-        // 不让出主线程 → CF edge 不会误判"流空闲"切断
-        // 但每个 chunk 64KB, 总内存峰值 = 64KB (不是 50MB)
-        while (sent < totalBytes) {
-          const remaining = totalBytes - sent
-          const currentLen = Math.min(chunkSize, remaining)
-          const chunk = new Uint8Array(currentLen)
-          crypto.getRandomValues(chunk)
-          controller.enqueue(chunk)
-          sent += currentLen
-        }
-        controller.close()
-      } catch (e) {
-        controller.error(e)
-      }
-    }
-  })
-
-  return new Response(stream, {
+  return new Response(buffer, {
     status: 200,
     headers: {
       'Content-Type': 'application/octet-stream',
