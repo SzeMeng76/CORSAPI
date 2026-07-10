@@ -916,19 +916,42 @@ m3u8 播放      → 走 <span class="g">/m3u8?url=</span>, .ts 子链接自动�
 // ---------- 测速端点 ----------
 // 流式返回指定 MB 数的随机字节, 客户端测下载速度 = 用户到 worker 的实际带宽
 // 默认 1MB, ?size=N (MB), 范围 1-50.
-// v2.0.81 修复: 之前用 ReadableStream + setTimeout(resolve, 0) 让出主线程, CF edge
-// 误判"流空闲"在传输途中切断, 导致 mobile 测到 received=0 显示 0.00 MB/s.
-// 改为一次性生成完整 buffer 后直接 Response, 不让出主线程, CF edge 不会切断.
-// 50MB 内存占用 50MB, CF Workers 单次 request 128MB 限制下 50MB 留 78MB 够用
+// v2.0.82 修复:
+//   - v2.0.80 用 ReadableStream + setTimeout(resolve, 0) 让出主线程 → CF edge
+//     误判"流空闲"在传输途中切断, mobile 测到 received=0 显示 0.00 MB/s
+//   - v2.0.81 改一次性 new Uint8Array(50MB) → CF Workers 128MB 内存限制下
+//     1MB 也返 500 error code 1101 (exceeded memory limit)
+//   - v2.0.82 用 ReadableStream 但不让出主线程, 每个 chunk 一次性 enqueue,
+//     持续高流量 CF edge 不会切断. 每次只占 64KB 内存, 50MB 不会爆内存
 async function handleSpeedTest(reqUrl) {
   const sizeParam = parseInt(reqUrl.searchParams.get('size') || '1', 10)
   const sizeMB = Math.max(1, Math.min(50, isNaN(sizeParam) ? 1 : sizeParam))
   const totalBytes = sizeMB * 1024 * 1024
-  // 一次性生成完整 buffer (而不是分 chunk + 让出), 避免 CF edge 把"流空闲"误判切断
-  const buffer = new Uint8Array(totalBytes)
-  crypto.getRandomValues(buffer)
+  const chunkSize = 64 * 1024 // 64KB per chunk, 小到内存无压力
 
-  return new Response(buffer, {
+  const stream = new ReadableStream({
+    start(controller) {
+      let sent = 0
+      try {
+        // 一次性循环 enqueue 所有 chunk, 不 await 任何东西
+        // 不让出主线程 → CF edge 不会误判"流空闲"切断
+        // 但每个 chunk 64KB, 总内存峰值 = 64KB (不是 50MB)
+        while (sent < totalBytes) {
+          const remaining = totalBytes - sent
+          const currentLen = Math.min(chunkSize, remaining)
+          const chunk = new Uint8Array(currentLen)
+          crypto.getRandomValues(chunk)
+          controller.enqueue(chunk)
+          sent += currentLen
+        }
+        controller.close()
+      } catch (e) {
+        controller.error(e)
+      }
+    }
+  })
+
+  return new Response(stream, {
     status: 200,
     headers: {
       'Content-Type': 'application/octet-stream',
