@@ -915,37 +915,20 @@ m3u8 播放      → 走 <span class="g">/m3u8?url=</span>, .ts 子链接自动�
 
 // ---------- 测速端点 ----------
 // 流式返回指定 MB 数的随机字节, 客户端测下载速度 = 用户到 worker 的实际带宽
-// 默认 1MB, ?size=N (MB), 范围 1-50. 用 ReadableStream 避免一次性分配大内存
+// 默认 1MB, ?size=N (MB), 范围 1-50.
+// v2.0.81 修复: 之前用 ReadableStream + setTimeout(resolve, 0) 让出主线程, CF edge
+// 误判"流空闲"在传输途中切断, 导致 mobile 测到 received=0 显示 0.00 MB/s.
+// 改为一次性生成完整 buffer 后直接 Response, 不让出主线程, CF edge 不会切断.
+// 50MB 内存占用 50MB, CF Workers 单次 request 128MB 限制下 50MB 留 78MB 够用
 async function handleSpeedTest(reqUrl) {
   const sizeParam = parseInt(reqUrl.searchParams.get('size') || '1', 10)
   const sizeMB = Math.max(1, Math.min(50, isNaN(sizeParam) ? 1 : sizeParam))
   const totalBytes = sizeMB * 1024 * 1024
-  const chunkSize = 256 * 1024 // 256KB per chunk, 平衡吞吐和内存
+  // 一次性生成完整 buffer (而不是分 chunk + 让出), 避免 CF edge 把"流空闲"误判切断
+  const buffer = new Uint8Array(totalBytes)
+  crypto.getRandomValues(buffer)
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      let sent = 0
-      const chunk = new Uint8Array(chunkSize)
-      try {
-        while (sent < totalBytes) {
-          const remaining = totalBytes - sent
-          const currentChunk = remaining >= chunkSize ? chunk : chunk.slice(0, remaining)
-          crypto.getRandomValues(currentChunk)
-          controller.enqueue(currentChunk)
-          sent += currentChunk.length
-          // 每发 1MB 让出一次主线程, 让底层 flush 数据
-          if (sent % (1024 * 1024) === 0) {
-            await new Promise(resolve => setTimeout(resolve, 0))
-          }
-        }
-        controller.close()
-      } catch (e) {
-        controller.error(e)
-      }
-    }
-  })
-
-  return new Response(stream, {
+  return new Response(buffer, {
     status: 200,
     headers: {
       'Content-Type': 'application/octet-stream',
