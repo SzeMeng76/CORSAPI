@@ -274,6 +274,21 @@ async function handleProxyRequest(request, targetUrlParam, currentOrigin) {
     return errorResponse('Invalid URL', { url: fullTargetUrl }, 400)
   }
 
+  // v2.0.20h: 优先用 worker 自带 Cache API, 绕开 Bunny.net 40 天老缓存
+  if (request.method === 'GET') {
+    try {
+      const cache = caches.default
+      const cacheKey = new Request(targetURL.toString(), { method: 'GET', headers: request.headers })
+      const cached = await cache.match(cacheKey)
+      if (cached) {
+        const h = new Headers(cached.headers)
+        h.set('Cache-Control', 'no-store')
+        h.set('X-Cache', 'WORKER-HIT')
+        return new Response(await cached.arrayBuffer(), { status: cached.status, headers: h })
+      }
+    } catch {}
+  }
+
   // 构造透传请求头,如果客户端没带必要的头,按目标域名补上 fallback
   // (典型:lain.bgm.tv 拒无 UA 的请求)
   const upstreamHeaders = new Headers(request.headers)
@@ -309,6 +324,16 @@ async function handleProxyRequest(request, targetUrlParam, currentOrigin) {
     }
     const response = await fetch(proxyRequest, fetchOptions)
     clearTimeout(timeoutId)
+
+    // v2.0.20h: 存到 worker Cache, 下次同 URL 直接 hit
+    if (request.method === 'GET' && response.status === 200) {
+      try {
+        const cache = caches.default
+        const cacheKey = new Request(targetURL.toString(), { method: 'GET', headers: upstreamHeaders })
+        const respToCache = new Response(response.clone().body, { status: response.status, headers: response.headers })
+        await cache.put(cacheKey, respToCache)
+      } catch (e) {}
+    }
 
     const responseHeaders = new Headers(CORS_HEADERS)
     for (const [key, value] of response.headers) {
