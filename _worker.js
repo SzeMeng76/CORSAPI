@@ -280,6 +280,10 @@ async function handleProxyRequest(request, targetUrlParam, currentOrigin) {
   applyDefaultHeadersForUpstream(upstreamHeaders, targetURL)
 
   try {
+    // v2.0.20f: 强制 upstream 重新校验, 绕开 Bunny.net 等 CDN 的 40 天老缓存
+    // (cdn-cachedat 显示 TMDB 走的 Bunny.net 缓存是 06/24 写的, 头里 alt-svc 一直老的)
+    upstreamHeaders.set('Cache-Control', 'max-age=0')
+    upstreamHeaders.set('Pragma', 'no-cache')
     const proxyRequest = new Request(targetURL.toString(), {
       method: request.method,
       headers: upstreamHeaders,
@@ -313,6 +317,11 @@ async function handleProxyRequest(request, targetUrlParam, currentOrigin) {
       if (!EXCLUDE_HEADERS.has(key.toLowerCase())) {
         responseHeaders.set(key, value)
       }
+    }
+    // v2.0.20f: 默认所有响应 no-store, 防止 CF 边缘缓存 Bunny.net 的 40 天老响应
+    if (response.status === 200) {
+      responseHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate')
+      responseHeaders.set('Pragma', 'no-cache')
     }
     // v2.0.28: .ts 段加 Cache-Control, 让 CF edge cache
     if (isTsSegment && response.status === 200) {
