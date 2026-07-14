@@ -889,7 +889,7 @@ async function handleHomePage(currentOrigin, defaultPrefix) {
         <div class="feat"><b>自反循环检测</b><br>防止 worker 套 worker</div>
         <div class="feat"><b>bgm.tv fallback</b><br>UA / Referer 自动补</div>
         <div class="feat"><b>M3U8 KV 缓存</b><br>5 分钟复用, 减少 worker CPU</div>
-        <div class="feat"><b>HTTP/3 (QUIC)</b><br>Alt-Svc 头提示升级, CF 默认开</div>
+        <div class="feat"><b>CANARY43 v2.0.20f HTTP/3 (QUIC)</b><br>Alt-Svc 头提示升级, CF 默认开</div>
       </div>
     </div>
 
