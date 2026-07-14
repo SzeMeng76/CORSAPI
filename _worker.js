@@ -296,12 +296,10 @@ async function handleProxyRequest(request, targetUrlParam, currentOrigin) {
     // v2.0.28: 视频 .ts 段可能几 MB, 9s 不够 → 30s
     const timeoutId = setTimeout(() => controller.abort(), 30000)
     // v2.0.28: 用 cf 选项让 CF cache .ts 段
-    // .ts 段是静态文件, 同一段第二次请求直接从 CF edge 返回, 不回源
+    // v2.0.20g: 删 .jpg/.jpeg/.png — 它们是图片, 不是视频段
+    //   之前错误归到 isTsSegment, 导致 image 走 public,max-age=3600 缓存 Bunny.net 40 天老数据
     const isTsSegment = targetURL.pathname.endsWith('.ts') ||
-                        targetURL.pathname.endsWith('.m4s') ||
-                        targetURL.pathname.endsWith('.jpeg') ||
-                        targetURL.pathname.endsWith('.jpg') ||
-                        targetURL.pathname.endsWith('.png')
+                        targetURL.pathname.endsWith('.m4s')
     const fetchOptions = {
       signal: controller.signal,
       cf: isTsSegment ? {
@@ -889,7 +887,7 @@ async function handleHomePage(currentOrigin, defaultPrefix) {
         <div class="feat"><b>自反循环检测</b><br>防止 worker 套 worker</div>
         <div class="feat"><b>bgm.tv fallback</b><br>UA / Referer 自动补</div>
         <div class="feat"><b>M3U8 KV 缓存</b><br>5 分钟复用, 减少 worker CPU</div>
-        <div class="feat"><b>CANARY43 v2.0.20f HTTP/3 (QUIC)</b><br>Alt-Svc 头提示升级, CF 默认开</div>
+        <div class="feat"><b>HTTP/3 (QUIC)</b><br>Alt-Svc 头提示升级, CF 默认开</div>
       </div>
     </div>
 
